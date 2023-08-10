@@ -65,13 +65,15 @@ protected:
   std::vector<Array<OneD, NekDouble>> m_physarrays;
   std::vector<Array<OneD, NekDouble>> m_coeffarrays;
 
-  void Laplace(Array<OneD, NekDouble>& tmp, Array<OneD, NekDouble>& rhs, const int index);
+  void Laplace(Array<OneD, NekDouble>& rhs, const int index);
 
 private:
   double m_timeStep;
   double m_theta;
 
   virtual Array<OneD, bool> v_GetSystemSingularChecks();
+  Array<OneD, NekDouble> m_laplacetmp;
+  Array<OneD, NekDouble> m_implicittmp;
 
 //  std::map<int, Array<OneD, NekDouble>> m_mapIntToArray;
 };

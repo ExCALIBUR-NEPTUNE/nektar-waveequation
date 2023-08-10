@@ -60,7 +60,8 @@ void WaveEquationSystem::v_InitObject(bool DeclareField)
   for (auto f : m_fields) {
     ASSERTL1(f->GetNpoints() > 0, "GetNpoints must return > 0");
   }
-
+  m_laplacetmp = Array<OneD, NekDouble>(nPts);
+  m_implicittmp = Array<OneD, NekDouble>(nPts);
 }
 
 
@@ -110,22 +111,22 @@ void WaveEquationSystem::setTheta(const double theta) {
   m_theta = theta;
 }
 
-void WaveEquationSystem::Laplace(Array<OneD, NekDouble>& tmp,
+void WaveEquationSystem::Laplace(
                                 Array<OneD, NekDouble>& rhs,
                                 const int index) {
-  const int nPts = tmp.GetCount();
-  Vmath::Zero(nPts, tmp, 1);
+  const int nPts = m_laplacetmp.GetCount();
+  Vmath::Zero(nPts, m_laplacetmp, 1);
   auto foo = m_fields[index]->GetPhys();
-  m_fields[index]->PhysDeriv(MultiRegions::eX, foo, tmp);
+  m_fields[index]->PhysDeriv(MultiRegions::eX, foo, m_laplacetmp);
   m_fields[index]->PhysDeriv(MultiRegions::eX, m_fields[index]->GetPhys(),
-                          tmp);
-  m_fields[index]->PhysDeriv(MultiRegions::eX, tmp, tmp);// tmp = ∇x² f
-  Vmath::Vadd(nPts, tmp, 1, rhs, 1, rhs, 1); // rhs = rhs + tmp = rhs + ∇x² f
-  Vmath::Zero(nPts, tmp, 1);
+                          m_laplacetmp);
+  m_fields[index]->PhysDeriv(MultiRegions::eX, m_laplacetmp, m_laplacetmp);// m_laplacetmp = ∇x² f
+  Vmath::Vadd(nPts, m_laplacetmp, 1, rhs, 1, rhs, 1); // rhs = rhs + m_laplacetmp = rhs + ∇x² f
+  Vmath::Zero(nPts, m_laplacetmp, 1);
   m_fields[index]->PhysDeriv(MultiRegions::eY, m_fields[index]->GetPhys(),
-                          tmp);
-  m_fields[index]->PhysDeriv(MultiRegions::eY, tmp, tmp);// tmp = ∇y² f
-  Vmath::Vadd(nPts, tmp, 1, tmp, 1, rhs, 1); // rhs = rhs + tmp = rhs + ∇y² f
+                          m_laplacetmp);
+  m_fields[index]->PhysDeriv(MultiRegions::eY, m_laplacetmp, m_laplacetmp);// m_laplacetmp = ∇y² f
+  Vmath::Vadd(nPts, m_laplacetmp, 1, m_laplacetmp, 1, rhs, 1); // rhs = rhs + m_laplacetmp = rhs + ∇y² f
   // rhs = ∇² f
 }
 
@@ -144,9 +145,8 @@ void WaveEquationSystem::LorenzGaugeSolve(const int field_t_index,
   auto f_1phys = m_fields[f_1]->UpdatePhys();
   auto sphys = m_fields[s]->GetPhys();
 
-  Array<OneD, NekDouble> tmp1(nPts, 0.0);
   Array<OneD, NekDouble> rhs(nPts, 0.0);
-  Laplace(tmp1, rhs, f0); // rhs = ∇² f0
+  Laplace(rhs, f0); // rhs = ∇² f0
 
   if (m_theta == 0.0) {
     // f⁺ = (2 + Δt^2 ∇²) f⁰ - f⁻ + Δt^2 s
@@ -182,14 +182,13 @@ void WaveEquationSystem::LorenzGaugeSolve(const int field_t_index,
 
     // and currently rhs = -2 (lambda + (1-theta)/theta ∇²) f0
 
-    Array<OneD, NekDouble> tmp2(nPts, 0.0);
-    Laplace(tmp1, tmp2, f_1); // tmp2 = ∇² f_1
+    Laplace(m_implicittmp, f_1); // m_implicittmp = ∇² f_1
 
     // Svtvp (n, a, x, _, y, _, z, _) -> z = a * x + y
-    Vmath::Svtvp(nPts, -lambda, f_1phys, 1, tmp2, 1, tmp2, 1);
-    // tmp2 = (∇² - lambda) f_1
-    Vmath::Vsub(nPts, rhs, 1, tmp2, 1, rhs, 1); // rhs now holds the f0 and f_1 rhs values
-    // rhs = rhs - tmp2
+    Vmath::Svtvp(nPts, -lambda, f_1phys, 1, m_implicittmp, 1, m_implicittmp, 1);
+    // m_implicittmp = (∇² - lambda) f_1
+    Vmath::Vsub(nPts, rhs, 1, m_implicittmp, 1, rhs, 1); // rhs now holds the f0 and f_1 rhs values
+    // rhs = rhs - m_implicittmp
     // rhs = -2 (lambda + (1-theta)/theta ∇²) f0 - (∇² - lambda) f_1
 
     // Svtvp (n, a, x, _, y, _, z, _) -> z = a * x + y
