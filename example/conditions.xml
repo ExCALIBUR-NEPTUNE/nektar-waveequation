@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<NEKTAR xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:noNamespaceSchemaLocation="http://www.nektar.info/schema/nektar.xsd">
+
+    <EXPANSIONS>
+        <E COMPOSITE="C[1]" NUMMODES="4" TYPE="MODIFIED" FIELDS="u_1,u0,u1,s" />
+    </EXPANSIONS>
+
+    <CONDITIONS>
+
+        <SOLVERINFO>
+            <I PROPERTY="EQTYPE" VALUE="WaveEquationSystem" />
+            <I PROPERTY="Projection" VALUE="Continuous" />
+        </SOLVERINFO>
+
+        <GLOBALSYSSOLNINFO>
+            <V VAR="u_1,u0,u1,s">
+            <I PROPERTY="GlobalSysSoln" VALUE="IterativeStaticCond" />
+            <I PROPERTY="Preconditioner" VALUE="Diagonal"/>
+            <I PROPERTY="IterativeSolverTolerance" VALUE="1e-8"/>
+            </V>
+        </GLOBALSYSSOLNINFO>
+
+        <PARAMETERS>
+            <P> Lambda = 0.0 </P>
+            <P> epsilon = -1.0 </P>
+            <!--- The TimeStep must be in nondimensional units -->
+            <!--- The dimensionalisation of time is the length_scale / 2.99e8 -->
+            <P> foo = 0 </P>
+            <P> TimeStep = 2.0^(-10 - foo) </P>
+            <!--- theta=0.5 for unconditionally stable implicit, 0.0 for fully explicit -->
+            <P> Theta = 0.0 </P>
+            <P> NumTimeSteps = 1024 * 2^foo </P>
+            <P> IO_InfoSteps   = 16 * 2^foo </P>
+            <P> IO_CheckSteps  = 16 * 2^foo </P>
+            <P> kx = 2.0 * PI </P>
+            <P> ky = 2.0 * PI </P>
+            <P> omega = sqrt(kx^2 + ky^2) </P>
+        </PARAMETERS>
+
+        <VARIABLES>
+            <V ID="0"> u_1 </V>
+            <V ID="1"> u0 </V>
+            <V ID="2"> u1 </V>
+            <V ID="3"> s </V>
+        </VARIABLES>
+
+        <FUNCTION NAME="InitialConditions">
+            <E VAR="u_1" VALUE="sin(kx * x + ky * y - omega * (-TimeStep))" />
+            <E VAR="u0"  VALUE="sin(kx * x + ky * y)" />
+            <E VAR="u1"  VALUE="0" />
+            <E VAR="s"   VALUE="0" />
+        </FUNCTION>
+
+        <BOUNDARYREGIONS>
+            <B ID="1"> C[100] </B>
+            <B ID="2"> C[200] </B>
+            <B ID="3"> C[300] </B>
+            <B ID="4"> C[400] </B>
+        </BOUNDARYREGIONS>
+
+        <BOUNDARYCONDITIONS>
+            <REGION REF="1">
+                <P VAR="u_1" VALUE="[3]" />
+                <P VAR="u0"  VALUE="[3]" />
+                <P VAR="u1"  VALUE="[3]" />
+                <P VAR="s"   VALUE="[3]" />
+            </REGION>
+            <REGION REF="2">
+                <P VAR="u_1" VALUE="[4]" />
+                <P VAR="u0"  VALUE="[4]" />
+                <P VAR="u1"  VALUE="[4]" />
+                <P VAR="s"   VALUE="[4]" />
+            </REGION>
+            <REGION REF="3">
+                <P VAR="u_1" VALUE="[1]" />
+                <P VAR="u0"  VALUE="[1]" />
+                <P VAR="u1"  VALUE="[1]" />
+                <P VAR="s"   VALUE="[1]" />
+            </REGION>
+            <REGION REF="4">
+                <P VAR="u_1" VALUE="[2]" />
+                <P VAR="u0"  VALUE="[2]" />
+                <P VAR="u1"  VALUE="[2]" />
+                <P VAR="s"   VALUE="[2]" />
+            </REGION>
+        </BOUNDARYCONDITIONS>
+
+    </CONDITIONS>
+
+</NEKTAR>
