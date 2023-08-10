@@ -35,7 +35,7 @@ WaveEquationSystem::WaveEquationSystem(
 
 void WaveEquationSystem::v_InitObject(bool DeclareField)
 {
-  this->EquationSystem::v_InitObject(DeclareField); // call EquationSystem v_InitObject
+  this->EquationSystem::v_InitObject(true); // call EquationSystem v_InitObject
 
   std::vector<std::string> variables = m_session->GetVariables();
   // Check variables are defined.
@@ -45,23 +45,26 @@ void WaveEquationSystem::v_InitObject(bool DeclareField)
                "Variable '" + variables[i] + "' not defined.");
   }
 
-  int nPts = GetNpoints();
-  int nVar = variables.size();
-  for (int i = 0; i < nVar; ++i) {
-    this->m_physarrays.push_back(Array<OneD, NekDouble>(nPts));
-    this->m_coeffarrays.push_back(Array<OneD, NekDouble>(nPts));
-    this->m_fields[i]->SetPhysArray(this->m_physarrays[i]);
-    this->m_fields[i]->SetCoeffsArray(this->m_coeffarrays[i]);
-  }
+  //int nPts = GetNpoints();
+  //int nCfs = GetNcoeffs();
+  //int nVar = variables.size();
+  //for (int i = 0; i < nVar; ++i) {
+  //  this->m_physarrays.push_back(Array<OneD, NekDouble>(nPts));
+  //  this->m_coeffarrays.push_back(Array<OneD, NekDouble>(nCfs));
+  //  this->m_fields[i]->SetPhysArray(this->m_physarrays[i]);
+  //  this->m_fields[i]->SetCoeffsArray(this->m_coeffarrays[i]);
+  //}
 
   // Read ICs from the file
-  this->v_SetInitialConditions(0.0, true, 0);
+  const int domain = 0; // if this is different to the DOMAIN in the mesh it segfaults.
+  this->v_SetInitialConditions(0.0, true, domain);
 
   for (auto f : m_fields) {
     ASSERTL1(f->GetNpoints() > 0, "GetNpoints must return > 0");
+    ASSERTL1(f->GetNcoeffs() > 0, "GetNcoeffs must return > 0");
   }
-  m_laplacetmp = Array<OneD, NekDouble>(nPts);
-  m_implicittmp = Array<OneD, NekDouble>(nPts);
+  m_laplacetmp = Array<OneD, NekDouble>(GetNpoints());
+  m_implicittmp = Array<OneD, NekDouble>(GetNpoints());
 }
 
 
@@ -168,7 +171,10 @@ void WaveEquationSystem::LorenzGaugeSolve(const int field_t_index,
                  m_fields[f_1]->UpdateCoeffs(), 1);
 
     Vmath::Vcopy(nPts, rhs, 1, f0phys, 1);
+    std::cout << "Explicit FwdTrans " << std::endl;
     m_fields[f0]->FwdTrans(f0phys, m_fields[f0]->UpdateCoeffs());
+    std::cout << "Explicit FwdTrans " << std::endl;
+
 
   } else {
     // need in the form (∇² - lambda)f⁺ = rhs, where
@@ -212,8 +218,12 @@ void WaveEquationSystem::LorenzGaugeSolve(const int field_t_index,
 
     if (!rhsAllZero) {
       m_factors[StdRegions::eFactorLambda] = lambda;
+    std::cout << "Helmsolve" << std::endl;
       m_fields[f0]->HelmSolve(rhs, m_fields[f0]->UpdateCoeffs(), m_factors);
+    std::cout << "Helmsolve" << std::endl;
+    std::cout << "Implicit BwdTrans " << std::endl;
       m_fields[f0]->BwdTrans(m_fields[f0]->GetCoeffs(), m_fields[f0]->UpdatePhys());
+    std::cout << "Implicit BwdTrans " << std::endl;
     } else {
       Vmath::Zero(nPts, m_fields[f0]->UpdateCoeffs(), 1);
       Vmath::Zero(nPts, m_fields[f0]->UpdatePhys(), 1);
