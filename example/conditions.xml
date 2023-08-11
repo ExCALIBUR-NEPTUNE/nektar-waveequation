@@ -15,7 +15,7 @@
 
         <GLOBALSYSSOLNINFO>
             <V VAR="u_1,u0,u1,s">
-            <I PROPERTY="GlobalSysSoln" VALUE="IterativeStaticCond" />
+            <I PROPERTY="GlobalSysSoln" VALUE="IterativeFull" />
             <I PROPERTY="Preconditioner" VALUE="Diagonal"/>
             <I PROPERTY="IterativeSolverTolerance" VALUE="1e-8"/>
             </V>
@@ -36,6 +36,7 @@
             <P> kx = 2.0 * PI </P>
             <P> ky = 2.0 * PI </P>
             <P> omega = sqrt(kx^2 + ky^2) </P>
+            <P> overwritememory = 1 </P>
         </PARAMETERS>
 
         <VARIABLES>
