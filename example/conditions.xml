@@ -36,7 +36,6 @@
             <P> kx = 2.0 * PI </P>
             <P> ky = 2.0 * PI </P>
             <P> omega = sqrt(kx^2 + ky^2) </P>
-            <P> overwritememory = 1 </P>
         </PARAMETERS>
 
         <VARIABLES>

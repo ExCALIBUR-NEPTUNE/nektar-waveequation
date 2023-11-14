@@ -37,23 +37,9 @@ void WaveEquationSystem::v_InitObject(bool DeclareField)
 {
   this->EquationSystem::v_InitObject(true); // call EquationSystem v_InitObject
 
-  int overwritememory = 0;
-  this->m_session->LoadParameter("overwritememory", overwritememory, 0);
-
   int nPts = GetNpoints();
   int nCfs = GetNcoeffs();
   int nVar = m_session->GetVariables().size();
-  for (int i = 0; i < nVar; ++i) {
-    if (overwritememory) {
-      std::cout << "Overwriting memory for species " << i << std::endl;
-      this->m_physarrays.push_back(Array<OneD, NekDouble>(nPts));
-      this->m_coeffarrays.push_back(Array<OneD, NekDouble>(nCfs));
-      this->m_fields[i]->SetPhysArray(this->m_physarrays[i]);
-      this->m_fields[i]->SetCoeffsArray(this->m_coeffarrays[i]);
-    }
-    std::cout << "Variable " << i << " has " << m_fields[i]->GetCoeffs().size() << " coeff points" << std::endl;
-    std::cout << "Variable " << i << " has " << m_fields[i]->GetPhys().size() << " phys points" << std::endl;
-  }
 
   // Read ICs from the file
   const int domain = 0; // if this is different to the DOMAIN in the mesh it segfaults.
