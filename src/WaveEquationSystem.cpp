@@ -137,6 +137,7 @@ void WaveEquationSystem::LorenzGaugeSolve(const int field_t_index,
 
   if (m_theta == 0.0) {
     // f⁺ = (2 + Δt^2 ∇²) f⁰ - f⁻ + Δt^2 s
+    std::cout << "Start explicit" << std::endl;
     Vmath::Smul(nPts, dt2, rhs, 1, rhs, 1);
     // rhs = Δt^2 ∇² f0
     // Svtvp (n, a, x, _, y, _, z, _) -> z = a * x + y
@@ -156,12 +157,15 @@ void WaveEquationSystem::LorenzGaugeSolve(const int field_t_index,
 
     Vmath::Vcopy(nPts, rhs, 1, f0phys, 1);
 
+    std::cout << "Before explicit FwdTrans" << std::endl;
     m_fields[f0]->FwdTrans(f0phys, m_fields[f0]->UpdateCoeffs());
+    std::cout << "After explicit FwdTrans" << std::endl;
 
 
   } else {
     // need in the form (∇² - lambda)f⁺ = rhs, where
     double lambda = 2.0 / dt2 / m_theta;
+    std::cout << "Start implicit" << std::endl;
 
     // and currently rhs = ∇² f0
     Vmath::Smul(nPts, -2 * (1 - m_theta) / m_theta, rhs, 1, rhs, 1);
@@ -201,12 +205,12 @@ void WaveEquationSystem::LorenzGaugeSolve(const int field_t_index,
 
     if (!rhsAllZero) {
       m_factors[StdRegions::eFactorLambda] = lambda;
-    std::cout << "Helmsolve" << std::endl;
+      std::cout << "Helmsolve" << std::endl;
       m_fields[f0]->HelmSolve(rhs, m_fields[f0]->UpdateCoeffs(), m_factors);
-    std::cout << "Helmsolve" << std::endl;
-    std::cout << "Implicit BwdTrans " << std::endl;
+      std::cout << "Helmsolve" << std::endl;
+      std::cout << "Implicit BwdTrans " << std::endl;
       m_fields[f0]->BwdTrans(m_fields[f0]->GetCoeffs(), m_fields[f0]->UpdatePhys());
-    std::cout << "Implicit BwdTrans " << std::endl;
+      std::cout << "Implicit BwdTrans " << std::endl;
     } else {
       Vmath::Zero(nPts, m_fields[f0]->UpdateCoeffs(), 1);
       Vmath::Zero(nPts, m_fields[f0]->UpdatePhys(), 1);
