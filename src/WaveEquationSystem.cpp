@@ -37,20 +37,12 @@ void WaveEquationSystem::v_InitObject(bool DeclareField)
 {
   this->EquationSystem::v_InitObject(true); // call EquationSystem v_InitObject
 
-  std::vector<std::string> variables = m_session->GetVariables();
-  // Check variables are defined.
-  for (int i = 0; i < variables.size(); ++i)
-  {
-      ASSERTL0(variables[i] == m_session->GetVariable(i),
-               "Variable '" + variables[i] + "' not defined.");
-  }
-
   int overwritememory = 0;
   this->m_session->LoadParameter("overwritememory", overwritememory, 0);
 
   int nPts = GetNpoints();
   int nCfs = GetNcoeffs();
-  int nVar = variables.size();
+  int nVar = m_session->GetVariables().size();
   for (int i = 0; i < nVar; ++i) {
     if (overwritememory) {
       std::cout << "Overwriting memory for species " << i << std::endl;
@@ -71,8 +63,8 @@ void WaveEquationSystem::v_InitObject(bool DeclareField)
     ASSERTL1(f->GetNpoints() > 0, "GetNpoints must return > 0");
     ASSERTL1(f->GetNcoeffs() > 0, "GetNcoeffs must return > 0");
   }
-  m_laplacetmp = Array<OneD, NekDouble>(GetNpoints());
-  m_implicittmp = Array<OneD, NekDouble>(GetNpoints());
+  m_laplacetmp = Array<OneD, NekDouble>(nPts);
+  m_implicittmp = Array<OneD, NekDouble>(nPts);
 }
 
 
@@ -125,10 +117,8 @@ void WaveEquationSystem::setTheta(const double theta) {
 void WaveEquationSystem::Laplace(
                                 Array<OneD, NekDouble>& rhs,
                                 const int index) {
-  const int nPts = m_laplacetmp.GetCount();
+  const int nPts = GetNpoints();
   Vmath::Zero(nPts, m_laplacetmp, 1);
-  auto foo = m_fields[index]->GetPhys();
-  m_fields[index]->PhysDeriv(MultiRegions::eX, foo, m_laplacetmp);
   m_fields[index]->PhysDeriv(MultiRegions::eX, m_fields[index]->GetPhys(),
                           m_laplacetmp);
   m_fields[index]->PhysDeriv(MultiRegions::eX, m_laplacetmp, m_laplacetmp);// m_laplacetmp = ∇x² f
@@ -137,7 +127,7 @@ void WaveEquationSystem::Laplace(
   m_fields[index]->PhysDeriv(MultiRegions::eY, m_fields[index]->GetPhys(),
                           m_laplacetmp);
   m_fields[index]->PhysDeriv(MultiRegions::eY, m_laplacetmp, m_laplacetmp);// m_laplacetmp = ∇y² f
-  Vmath::Vadd(nPts, m_laplacetmp, 1, m_laplacetmp, 1, rhs, 1); // rhs = rhs + m_laplacetmp = rhs + ∇y² f
+  Vmath::Vadd(nPts, m_laplacetmp, 1, rhs, 1, rhs, 1); // rhs = rhs + m_laplacetmp = rhs + ∇y² f
   // rhs = ∇² f
 }
 
@@ -146,15 +136,15 @@ void WaveEquationSystem::LorenzGaugeSolve(const int field_t_index,
                                           const int source_index) {
   // copy across into shorter variable names to make sure code fits
   // on one line, more readable that way.
-  const int f0 = field_t_index;
-  const int f_1 = field_t_minus1_index;
-  const int s = source_index;
-  const int nPts = GetNpoints();
+  const int f0     = field_t_index;
+  const int f_1    = field_t_minus1_index;
+  const int s      = source_index;
+  const int nPts   = GetNpoints();
   const double dt2 = std::pow(m_timestep, 2);
 
-  auto f0phys = m_fields[f0]->UpdatePhys();
+  auto f0phys  = m_fields[f0]->UpdatePhys();
   auto f_1phys = m_fields[f_1]->UpdatePhys();
-  auto sphys = m_fields[s]->GetPhys();
+  auto sphys   = m_fields[s]->GetPhys();
 
   Array<OneD, NekDouble> rhs(nPts, 0.0);
   Laplace(rhs, f0); // rhs = ∇² f0
@@ -179,9 +169,8 @@ void WaveEquationSystem::LorenzGaugeSolve(const int field_t_index,
                  m_fields[f_1]->UpdateCoeffs(), 1);
 
     Vmath::Vcopy(nPts, rhs, 1, f0phys, 1);
-    std::cout << "Explicit FwdTrans " << std::endl;
+
     m_fields[f0]->FwdTrans(f0phys, m_fields[f0]->UpdateCoeffs());
-    std::cout << "Explicit FwdTrans " << std::endl;
 
 
   } else {
@@ -237,8 +226,6 @@ void WaveEquationSystem::LorenzGaugeSolve(const int field_t_index,
       Vmath::Zero(nPts, m_fields[f0]->UpdatePhys(), 1);
     }
   }
-
-  m_fields[f0]->SetPhysState(true); // don't need this
 }
 
 } // namespace Nektar
