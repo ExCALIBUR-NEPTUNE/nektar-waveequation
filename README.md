@@ -13,4 +13,8 @@ make install
 ```
 By default and unless a `CMAKE_INSTALL_PREFIX` is supplied binaries will appear in `build/dist/bin`. If Nektar++ is built with MPI, this will be supported in the `WaveEquationSolver`.
 
+## Right now it's broken
+
+There appears to be an instabilibity arising at the periodic boundaries where the derivative should be zero i.e. the periodic boundary in `x` when the dynamics are going like `sin(t - v y)`.
+
 
