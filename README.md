@@ -17,4 +17,6 @@ By default and unless a `CMAKE_INSTALL_PREFIX` is supplied binaries will appear 
 
 There appears to be an instabilibity arising at the periodic boundaries where the derivative should be zero i.e. the periodic boundary in `x` when the dynamics are going like `sin(t - v y)`.
 
+Instead of propagating a sine wave upwards through the box, it does htis:
 
+![ Alt text](figs/anim.gif)
