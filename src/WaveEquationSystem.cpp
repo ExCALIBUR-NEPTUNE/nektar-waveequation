@@ -190,7 +190,7 @@ void WaveEquationSystem::LorenzGaugeSolve(const int field_t_index,
     // rhs now has the source term too
     // rhs = -2 (lambda + (1-theta)/theta ∇²) f0 - (∇² - lambda) f_1 - 2/theta * s
 
-    // copy f_1 coefficients to f0 (no need to solve again!)
+    // copy f0 coefficients to f_1 (no need to solve again!)
     Vmath::Vcopy(nPts, m_fields[f0]->GetPhys(), 1,
         m_fields[f_1]->UpdatePhys(), 1);
     Vmath::Vcopy(nPts, m_fields[f0]->GetCoeffs(), 1,
@@ -203,7 +203,7 @@ void WaveEquationSystem::LorenzGaugeSolve(const int field_t_index,
         break;
       }
     }
-
+    // now solve f1 but store in f0
     if (!rhsAllZero) {
       m_factors[StdRegions::eFactorLambda] = lambda;
       m_fields[f0]->HelmSolve(rhs, m_fields[f0]->UpdateCoeffs(), m_factors);
