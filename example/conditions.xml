@@ -3,7 +3,7 @@
     xsi:noNamespaceSchemaLocation="http://www.nektar.info/schema/nektar.xsd">
 
     <EXPANSIONS>
-        <E COMPOSITE="C[1]" NUMMODES="2" TYPE="MODIFIED" FIELDS="u_1,u0,u1,s" />
+        <E COMPOSITE="C[1]" NUMMODES="3" TYPE="MODIFIED" FIELDS="u_1,u0,u1,s" />
     </EXPANSIONS>
 
     <CONDITIONS>
@@ -26,10 +26,10 @@
             <P> epsilon = -4.0 </P>
             <!--- The TimeStep must be in nondimensional units -->
             <!--- The dimensionalisation of time is the length_scale / 2.99e8 -->
-            <P> resolutionfactor = 2 </P>
-            <P> TimeStep = 2.0^(-10 - resolutionfactor) </P>
+            <P> resolutionfactor = 0 </P>
+            <P> TimeStep = 2.0^(-8 - resolutionfactor) </P>
             <!--- theta=0.5 for unconditionally stable implicit, 0.0 for fully explicit -->
-            <P> Theta = 0.0 </P>
+            <P> Theta = 0.5 </P>
             <P> NumTimeSteps = 1024 * 2^resolutionfactor </P>
             <P> IO_InfoSteps   = 16 * 2^resolutionfactor </P>
             <P> IO_CheckSteps  = 16 * 2^resolutionfactor </P>

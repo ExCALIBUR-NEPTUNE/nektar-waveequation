@@ -19,7 +19,7 @@
     </GEOMETRY>
 
     <EXPANSIONS>
-        <E COMPOSITE="C[1]" NUMMODES="4" TYPE="MODIFIED" FIELDS="u_1,u0,u1,s" />
+        <E COMPOSITE="C[1]" NUMMODES="3" TYPE="MODIFIED" FIELDS="u_1,u0,u1,s" />
     </EXPANSIONS>
     <Metadata>
         <Provenance>
