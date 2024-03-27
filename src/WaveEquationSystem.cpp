@@ -158,7 +158,7 @@ void WaveEquationSystem::LorenzGaugeSolve(const int field_t_index,
     // f_1 -> f0 // f_1 now holds f0 (phys values)
     // Copy f_1 coefficients to f0 (no need to solve again!) ((N.B. phys values
     // copied across above)) N.B. phys values were copied above
-    Vmath::Vcopy(nPts, m_fields[f0]->GetCoeffs(), 1,
+    Vmath::Vcopy(nCoeff, m_fields[f0]->GetCoeffs(), 1,
                  m_fields[f_1]->UpdateCoeffs(), 1);
 
     Vmath::Vcopy(nPts, rhs, 1, f0phys, 1);
@@ -193,7 +193,7 @@ void WaveEquationSystem::LorenzGaugeSolve(const int field_t_index,
     // copy f0 coefficients to f_1 (no need to solve again!)
     Vmath::Vcopy(nPts, m_fields[f0]->GetPhys(), 1,
         m_fields[f_1]->UpdatePhys(), 1);
-    Vmath::Vcopy(nPts, m_fields[f0]->GetCoeffs(), 1,
+    Vmath::Vcopy(nCoeff, m_fields[f0]->GetCoeffs(), 1,
         m_fields[f_1]->UpdateCoeffs(), 1);
 
     bool rhsAllZero = true;
