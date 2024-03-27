@@ -148,7 +148,7 @@ void WaveEquationSystem::Laplace(
                                 Array<OneD, NekDouble>& rhs,
                                 const int index) {
   const int nPts = GetNpoints();
-  
+
   // Use diffusion object to calculate second deriv
   // - Copy target field into temp array to work around diffusion API restrictions
   Vmath::Zero(nPts, m_diff_out_arr[0], 1);
@@ -168,6 +168,7 @@ void WaveEquationSystem::LorenzGaugeSolve(const int field_t_index,
   const int f_1    = field_t_minus1_index;
   const int s      = source_index;
   const int nPts   = GetNpoints();
+  const int nCfs   = GetNcoeffs();
   const double dt2 = std::pow(m_timestep, 2);
 
   auto f0phys  = m_fields[f0]->UpdatePhys();
@@ -193,7 +194,7 @@ void WaveEquationSystem::LorenzGaugeSolve(const int field_t_index,
     // f_1 -> f0 // f_1 now holds f0 (phys values)
     // Copy f_1 coefficients to f0 (no need to solve again!) ((N.B. phys values
     // copied across above)) N.B. phys values were copied above
-    Vmath::Vcopy(nPts, m_fields[f0]->GetCoeffs(), 1,
+    Vmath::Vcopy(nCfs, m_fields[f0]->GetCoeffs(), 1,
                  m_fields[f_1]->UpdateCoeffs(), 1);
 
     Vmath::Vcopy(nPts, rhs, 1, f0phys, 1);
@@ -228,7 +229,7 @@ void WaveEquationSystem::LorenzGaugeSolve(const int field_t_index,
     // copy f0 coefficients to f_1 (no need to solve again!)
     Vmath::Vcopy(nPts, m_fields[f0]->GetPhys(), 1,
         m_fields[f_1]->UpdatePhys(), 1);
-    Vmath::Vcopy(nPts, m_fields[f0]->GetCoeffs(), 1,
+    Vmath::Vcopy(nCfs, m_fields[f0]->GetCoeffs(), 1,
         m_fields[f_1]->UpdateCoeffs(), 1);
 
     bool rhsAllZero = true;
@@ -244,7 +245,7 @@ void WaveEquationSystem::LorenzGaugeSolve(const int field_t_index,
       m_fields[f0]->HelmSolve(rhs, m_fields[f0]->UpdateCoeffs(), m_factors);
       m_fields[f0]->BwdTrans(m_fields[f0]->GetCoeffs(), m_fields[f0]->UpdatePhys());
     } else {
-      Vmath::Zero(nPts, m_fields[f0]->UpdateCoeffs(), 1);
+      Vmath::Zero(nCfs, m_fields[f0]->UpdateCoeffs(), 1);
       Vmath::Zero(nPts, m_fields[f0]->UpdatePhys(), 1);
     }
   }
