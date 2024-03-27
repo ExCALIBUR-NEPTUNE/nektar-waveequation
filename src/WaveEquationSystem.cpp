@@ -133,6 +133,7 @@ void WaveEquationSystem::LorenzGaugeSolve(const int field_t_index,
   const int f_1    = field_t_minus1_index;
   const int s      = source_index;
   const int nPts   = GetNpoints();
+  const int nCoeff = GetNcoeffs();
   const double dt2 = std::pow(m_timestep, 2);
 
   auto f0phys  = m_fields[f0]->UpdatePhys();
