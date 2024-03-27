@@ -1,1 +1,1 @@
-mpirun -n <NMPI> <SOLVER_EXEC> conditions.xml mesh.xml
+<SOLVER_EXEC> conditions.xml mesh.xml
