@@ -8,7 +8,7 @@ std::string WaveEquationSystem::className =
 WaveEquationSystem::WaveEquationSystem(
     const LibUtilities::SessionReaderSharedPtr &pSession,
     const SpatialDomains::MeshGraphSharedPtr &pGraph)
-    : EquationSystem(pSession, pGraph), m_factors() {
+    : EquationSystem(pSession, pGraph), m_factors(),m_diff_in_arr(1), m_diff_out_arr(1), m_diff_fields(1) {
 
   pSession->LoadParameter("TimeStep", m_timestep);
   ASSERTL1(m_timestep > 0,
@@ -58,6 +58,18 @@ void WaveEquationSystem::v_InitObject(bool DeclareField)
   }
   m_laplacetmp = Array<OneD, NekDouble>(nPts);
   m_implicittmp = Array<OneD, NekDouble>(nPts);
+
+  // Set up diffusion object
+  std::string diff_type;
+  m_session->LoadSolverInfo("DiffusionType", diff_type, "LDG");
+  m_diffusion = GetDiffusionFactory().CreateInstance(diff_type, diff_type);
+  m_diffusion->SetFluxVector(&WaveEquationSystem::GetDiffusionFluxVector, this);
+  m_diffusion->InitObject(m_session, m_fields);
+
+  // Allocate temporary arrays used in the diffusion calc
+  m_diff_in_arr[0] = Array<OneD, NekDouble>(nPts);
+  m_diff_out_arr[0] = Array<OneD, NekDouble>(nPts, 0.0);
+  m_diff_fields[0] = m_fields[this->GetFieldIndex("u0")];
 }
 
 
@@ -107,21 +119,44 @@ void WaveEquationSystem::setTheta(const double theta) {
   m_theta = theta;
 }
 
+
+
+/**
+ * @brief Return the flux vector for the unsteady diffusion problem.
+ */
+void WaveEquationSystem::GetDiffusionFluxVector(
+    const Array<OneD, Array<OneD, NekDouble>> &in_arr,
+    const Array<OneD, Array<OneD, Array<OneD, NekDouble>>> &q_field,
+    Array<OneD, Array<OneD, Array<OneD, NekDouble>>> &viscous_tensor) {
+  boost::ignore_unused(in_arr);
+
+  unsigned int nDim = q_field.size();
+  unsigned int nConvectiveFields = q_field[0].size();
+  unsigned int nPts = q_field[0][0].size();
+
+  // Hard-code diff coeffs
+  NekDouble d[2] = {1.0, 1.0};
+
+  for (unsigned int j = 0; j < nDim; ++j) {
+    for (unsigned int i = 0; i < nConvectiveFields; ++i) {
+      Vmath::Smul(nPts, d[j], q_field[j][i], 1, viscous_tensor[j][i], 1);
+    }
+  }
+}
+
 void WaveEquationSystem::Laplace(
                                 Array<OneD, NekDouble>& rhs,
                                 const int index) {
   const int nPts = GetNpoints();
-  Vmath::Zero(nPts, m_laplacetmp, 1);
-  m_fields[index]->PhysDeriv(MultiRegions::eX, m_fields[index]->GetPhys(),
-                          m_laplacetmp);
-  m_fields[index]->PhysDeriv(MultiRegions::eX, m_laplacetmp, m_laplacetmp);// m_laplacetmp = ∇x² f
-  Vmath::Vadd(nPts, m_laplacetmp, 1, rhs, 1, rhs, 1); // rhs = rhs + m_laplacetmp = rhs + ∇x² f
-  Vmath::Zero(nPts, m_laplacetmp, 1);
-  m_fields[index]->PhysDeriv(MultiRegions::eY, m_fields[index]->GetPhys(),
-                          m_laplacetmp);
-  m_fields[index]->PhysDeriv(MultiRegions::eY, m_laplacetmp, m_laplacetmp);// m_laplacetmp = ∇y² f
-  Vmath::Vadd(nPts, m_laplacetmp, 1, rhs, 1, rhs, 1); // rhs = rhs + m_laplacetmp = rhs + ∇y² f
-  // rhs = ∇² f
+
+  // Use diffusion object to calculate second deriv
+  // - Copy target field into temp array to work around diffusion API restrictions
+  Vmath::Zero(nPts, m_diff_out_arr[0], 1);
+  Vmath::Vcopy(nPts, m_fields[index]->GetPhys(), 1, m_diff_in_arr[0], 1);
+  m_diffusion->Diffuse(1, m_diff_fields, m_diff_in_arr, m_diff_out_arr);
+  // - Add result to RHS
+  Vmath::Vadd(nPts, m_diff_out_arr[0], 1, rhs, 1, rhs, 1);
+
 }
 
 void WaveEquationSystem::LorenzGaugeSolve(const int field_t_index,
@@ -133,7 +168,7 @@ void WaveEquationSystem::LorenzGaugeSolve(const int field_t_index,
   const int f_1    = field_t_minus1_index;
   const int s      = source_index;
   const int nPts   = GetNpoints();
-  const int nCoeff = GetNcoeffs();
+  const int nCfs   = GetNcoeffs();
   const double dt2 = std::pow(m_timestep, 2);
 
   auto f0phys  = m_fields[f0]->UpdatePhys();
@@ -159,7 +194,7 @@ void WaveEquationSystem::LorenzGaugeSolve(const int field_t_index,
     // f_1 -> f0 // f_1 now holds f0 (phys values)
     // Copy f_1 coefficients to f0 (no need to solve again!) ((N.B. phys values
     // copied across above)) N.B. phys values were copied above
-    Vmath::Vcopy(nCoeff, m_fields[f0]->GetCoeffs(), 1,
+    Vmath::Vcopy(nCfs, m_fields[f0]->GetCoeffs(), 1,
                  m_fields[f_1]->UpdateCoeffs(), 1);
 
     Vmath::Vcopy(nPts, rhs, 1, f0phys, 1);
@@ -194,7 +229,7 @@ void WaveEquationSystem::LorenzGaugeSolve(const int field_t_index,
     // copy f0 coefficients to f_1 (no need to solve again!)
     Vmath::Vcopy(nPts, m_fields[f0]->GetPhys(), 1,
         m_fields[f_1]->UpdatePhys(), 1);
-    Vmath::Vcopy(nCoeff, m_fields[f0]->GetCoeffs(), 1,
+    Vmath::Vcopy(nCfs, m_fields[f0]->GetCoeffs(), 1,
         m_fields[f_1]->UpdateCoeffs(), 1);
 
     bool rhsAllZero = true;
@@ -210,7 +245,7 @@ void WaveEquationSystem::LorenzGaugeSolve(const int field_t_index,
       m_fields[f0]->HelmSolve(rhs, m_fields[f0]->UpdateCoeffs(), m_factors);
       m_fields[f0]->BwdTrans(m_fields[f0]->GetCoeffs(), m_fields[f0]->UpdatePhys());
     } else {
-      Vmath::Zero(nPts, m_fields[f0]->UpdateCoeffs(), 1);
+      Vmath::Zero(nCfs, m_fields[f0]->UpdateCoeffs(), 1);
       Vmath::Zero(nPts, m_fields[f0]->UpdatePhys(), 1);
     }
   }

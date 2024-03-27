@@ -10,7 +10,7 @@
 
         <SOLVERINFO>
             <I PROPERTY="EQTYPE" VALUE="WaveEquationSystem" />
-            <I PROPERTY="Projection" VALUE="Continuous" />
+            <I PROPERTY="Projection" VALUE="DisContinuous" />
         </SOLVERINFO>
 
         <GLOBALSYSSOLNINFO>
