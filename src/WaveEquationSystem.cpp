@@ -180,7 +180,7 @@ void WaveEquationSystem::LorenzGaugeSolve(const int field_t_index,
   auto &f_1coeff = m_fields[f_1]->UpdateCoeffs();
   auto scoeff   = m_fields[s]->GetCoeffs();
 
-  Array<OneD, NekDouble> rhs(nPts, 0.0);
+  Array<OneD, NekDouble> rhs(nPts, 0.0), tmp(nCfs, 0.0), tmp2(nCfs, 0.0);
   //Laplace(rhs, f0); // rhs = ∇² f0
 
   if (m_theta == 0.0) {
