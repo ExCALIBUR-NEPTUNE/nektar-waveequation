@@ -55,8 +55,9 @@ int main(int argc, char *argv[])
         std::string driverName;
         session->LoadSolverInfo("Driver", driverName, "Standard");
 
-        auto waveeqnDriver = WaveEquationDriver<ContField>(session, graph);
-        waveeqnDriver.run();
+        auto waveeqnDriver = std::make_shared<WaveEquationDriver<ContField>>(session, graph);
+        waveeqnDriver->InitObject();
+        waveeqnDriver->run();
 
         // Finalise session
         session->Finalise();
