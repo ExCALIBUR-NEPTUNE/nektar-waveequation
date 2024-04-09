@@ -52,11 +52,10 @@ public:
                      SpatialDomains::MeshGraphSharedPtr graph)
       : WaveEquationSystem(session, graph), session(session), graph(graph) {
     this->session->LoadParameter("NumTimeSteps", this->m_numTimeSteps, 1024);
-    this->v_InitObject(true);
   };
 
 
-  void v_InitObject(bool DeclareField)
+  void v_InitObject(bool DeclareField) override
   {
     WaveEquationSystem::v_InitObject(DeclareField);
   }

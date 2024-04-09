@@ -55,9 +55,9 @@ public:
 
 protected:
   StdRegions::ConstFactorMap m_factors;
-  virtual void v_InitObject(bool DeclareFields = true);
-  virtual void v_DoSolve();
-  virtual void v_GenerateSummary(SolverUtils::SummaryList &s);
+  void v_InitObject(bool DeclareFields = true) override;
+  void v_DoSolve() override;
+  void v_GenerateSummary(SolverUtils::SummaryList &s) override;
   void SubtractMean(int field_index);
   std::vector<Array<OneD, NekDouble>> m_physarrays;
   std::vector<Array<OneD, NekDouble>> m_coeffarrays;
@@ -69,7 +69,7 @@ private:
   double m_timeStep;
   double m_theta;
 
-  virtual Array<OneD, bool> v_GetSystemSingularChecks();
+  Array<OneD, bool> v_GetSystemSingularChecks() override;
   Array<OneD, NekDouble> m_laplacetmp;
   Array<OneD, NekDouble> m_implicittmp;
 

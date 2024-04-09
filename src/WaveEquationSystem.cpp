@@ -41,16 +41,18 @@ void WaveEquationSystem::v_InitObject(bool DeclareField)
   int nCfs = GetNcoeffs();
   int nVar = m_session->GetVariables().size();
 
+  /*
   for (int i = 0; i < nVar; ++i) {
     this->m_physarrays.push_back(Array<OneD, NekDouble>(nPts));
     this->m_coeffarrays.push_back(Array<OneD, NekDouble>(nCfs));
     this->m_fields[i]->SetPhysArray(this->m_physarrays[i]);
     this->m_fields[i]->SetCoeffsArray(this->m_coeffarrays[i]);
   }
+  */
 
   // Read ICs from the file
   const int domain = 0; // if this is different to the DOMAIN in the mesh it segfaults.
-  this->v_SetInitialConditions(0.0, true, domain);
+  this->SetInitialConditions(0.0, true, domain);
 
   for (auto f : m_fields) {
     ASSERTL1(f->GetNpoints() > 0, "GetNpoints must return > 0");
@@ -174,32 +176,36 @@ void WaveEquationSystem::LorenzGaugeSolve(const int field_t_index,
   auto f0phys  = m_fields[f0]->UpdatePhys();
   auto f_1phys = m_fields[f_1]->UpdatePhys();
   auto sphys   = m_fields[s]->GetPhys();
+  auto &f0coeff  = m_fields[f0]->UpdateCoeffs();
+  auto &f_1coeff = m_fields[f_1]->UpdateCoeffs();
+  auto scoeff   = m_fields[s]->GetCoeffs();
 
-  Array<OneD, NekDouble> rhs(nPts, 0.0);
-  Laplace(rhs, f0); // rhs = ∇² f0
+  Array<OneD, NekDouble> rhs(nPts, 0.0), tmp(nCfs, 0.0), tmp2(nCfs, 0.0);
+  //Laplace(rhs, f0); // rhs = ∇² f0
 
   if (m_theta == 0.0) {
-    // f⁺ = (2 + Δt^2 ∇²) f⁰ - f⁻ + Δt^2 s
-    Vmath::Smul(nPts, dt2, rhs, 1, rhs, 1);
-    // rhs = Δt^2 ∇² f0
-    // Svtvp (n, a, x, _, y, _, z, _) -> z = a * x + y
-    Vmath::Svtvp(nPts, 2.0, f0phys, 1, rhs, 1, rhs, 1);
-    // rhs = Δt^2 ∇² f0 + 2f0
-    Vmath::Svtvp(nPts, -1.0, f_1phys, 1, rhs, 1, rhs, 1);
-    // rhs = Δt^2 ∇² f0 + 2f0 - f_1
-    Vmath::Svtvp(nPts, dt2, sphys, 1, rhs, 1, rhs, 1);
-    // rhs = Δt^2 ∇² f0 + 2f0 - f_1 + dt^2 s
+    // Apply Laplacian matrix op -> tmp
+    MultiRegions::GlobalMatrixKey mkey(StdRegions::eLaplacian);
 
-    Vmath::Vcopy(nPts, f0phys, 1, f_1phys, 1);
-    // f_1 -> f0 // f_1 now holds f0 (phys values)
-    // Copy f_1 coefficients to f0 (no need to solve again!) ((N.B. phys values
-    // copied across above)) N.B. phys values were copied above
-    Vmath::Vcopy(nCfs, m_fields[f0]->GetCoeffs(), 1,
-                 m_fields[f_1]->UpdateCoeffs(), 1);
+    // Evaluate M^{-1} * L * u
+    m_fields[f0]->GeneralMatrixOp(mkey, f0coeff, tmp);
+    m_fields[f0]->MultiplyByInvMassMatrix(tmp, tmp2);
 
-    Vmath::Vcopy(nPts, rhs, 1, f0phys, 1);
+    // Temporary copy for f_0 to transfer to f_{-1}
+    Vmath::Vcopy(nCfs, f0coeff, 1, tmp, 1);
 
-    m_fields[f0]->FwdTrans(f0phys, m_fields[f0]->UpdateCoeffs());
+    // Central difference timestepping
+    for (int i = 0; i < nCfs; ++i)
+    {
+        f0coeff[i] = 2 * f0coeff[i] - dt2 * tmp2[i] - f_1coeff[i];
+    }
+
+    // Update f_{-1}
+    Vmath::Vcopy(nCfs, tmp, 1, f_1coeff, 1);
+
+    // backward transform -- not really necessary
+    m_fields[f0]->BwdTrans(f0coeff, f0phys);
+    m_fields[f_1]->BwdTrans(f_1coeff, f_1phys);
   } else {
     // need in the form (∇² - lambda)f⁺ = rhs, where
     double lambda = 2.0 / dt2 / m_theta;
