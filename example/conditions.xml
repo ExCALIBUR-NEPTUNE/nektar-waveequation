@@ -29,7 +29,7 @@
             <P> resolutionfactor = 0 </P>
             <P> TimeStep = 2.0^(-10 - resolutionfactor) </P>
             <!--- theta=0.5 for unconditionally stable implicit, 0.0 for fully explicit -->
-            <P> Theta = 0.0 </P>
+            <P> Theta = 0.5 </P>
             <P> NumTimeSteps = 1024 * 2^resolutionfactor </P>
             <P> IO_InfoSteps   = 16 * 2^resolutionfactor </P>
             <P> IO_CheckSteps  = 16 * 2^resolutionfactor </P>

@@ -180,13 +180,12 @@ void WaveEquationSystem::LorenzGaugeSolve(const int field_t_index,
   auto &f_1coeff = m_fields[f_1]->UpdateCoeffs();
   auto scoeff   = m_fields[s]->GetCoeffs();
 
-  Array<OneD, NekDouble> rhs(nPts, 0.0), tmp(nCfs, 0.0), tmp2(nCfs, 0.0);
-  //Laplace(rhs, f0); // rhs = ∇² f0
+  Array<OneD, NekDouble> rhs(nCfs, 0.0), tmp(nCfs, 0.0), tmp2(nCfs, 0.0);
+
+  // Apply Laplacian matrix op -> tmp
+  MultiRegions::GlobalMatrixKey mkey(StdRegions::eLaplacian);
 
   if (m_theta == 0.0) {
-    // Apply Laplacian matrix op -> tmp
-    MultiRegions::GlobalMatrixKey mkey(StdRegions::eLaplacian);
-
     // Evaluate M^{-1} * L * u
     m_fields[f0]->GeneralMatrixOp(mkey, f0coeff, tmp);
     m_fields[f0]->MultiplyByInvMassMatrix(tmp, tmp2);
@@ -197,7 +196,7 @@ void WaveEquationSystem::LorenzGaugeSolve(const int field_t_index,
     // Central difference timestepping
     for (int i = 0; i < nCfs; ++i)
     {
-        f0coeff[i] = 2 * f0coeff[i] - dt2 * tmp2[i] - f_1coeff[i];
+        f0coeff[i] = 2 * f0coeff[i] - dt2 * tmp2[i] - f_1coeff[i] + scoeff[i];
     }
 
     // Update f_{-1}
@@ -210,25 +209,30 @@ void WaveEquationSystem::LorenzGaugeSolve(const int field_t_index,
     // need in the form (∇² - lambda)f⁺ = rhs, where
     double lambda = 2.0 / dt2 / m_theta;
 
-    // and currently rhs = ∇² f0
-    Vmath::Smul(nPts, -2 * (1 - m_theta) / m_theta, rhs, 1, rhs, 1);
+    // Evaluate M^{-1} * L * u
+    m_fields[f0]->GeneralMatrixOp(mkey, f0coeff, tmp);
+    m_fields[f0]->MultiplyByInvMassMatrix(tmp, rhs);  // rhs = ∇² f0
+    // rhs = ∇² f0
+    Vmath::Smul(nCfs, -2 * (1 - m_theta) / m_theta, rhs, 1, rhs, 1);
     // Svtvp (n, a, x, _, y, _, z, _) -> z = a * x + y
-    Vmath::Svtvp(nPts, -2 * lambda, f0phys, 1, rhs, 1, rhs,
+    Vmath::Svtvp(nCfs, -2 * lambda, f0coeff, 1, rhs, 1, rhs,
                  1); // rhs now holds the f0 rhs values
 
     // and currently rhs = -2 (lambda + (1-theta)/theta ∇²) f0
 
-    Laplace(m_implicittmp, f_1); // m_implicittmp = ∇² f_1
+    // Evaluate M^{-1} * L * u
+    m_fields[f_1]->GeneralMatrixOp(mkey, f_1coeff, tmp);
+    m_fields[f_1]->MultiplyByInvMassMatrix(tmp, tmp2); // tmp2 = ∇² f_1
 
     // Svtvp (n, a, x, _, y, _, z, _) -> z = a * x + y
-    Vmath::Svtvp(nPts, -lambda, f_1phys, 1, m_implicittmp, 1, m_implicittmp, 1);
-    // m_implicittmp = (∇² - lambda) f_1
-    Vmath::Vsub(nPts, rhs, 1, m_implicittmp, 1, rhs, 1); // rhs now holds the f0 and f_1 rhs values
-    // rhs = rhs - m_implicittmp
+    Vmath::Svtvp(nCfs, -lambda, f_1coeff, 1, tmp2, 1, tmp2, 1);
+    // tmp2  = (∇² - lambda) f_1
+    Vmath::Vsub(nCfs, rhs, 1, tmp2, 1, rhs, 1); // rhs now holds the f0 and f_1 rhs values
+    // rhs = rhs - tmp2
     // rhs = -2 (lambda + (1-theta)/theta ∇²) f0 - (∇² - lambda) f_1
 
     // Svtvp (n, a, x, _, y, _, z, _) -> z = a * x + y
-    Vmath::Svtvp(nPts, -2.0 / m_theta, sphys, 1, rhs, 1, rhs, 1);
+    Vmath::Svtvp(nCfs, -2.0 / m_theta, scoeff, 1, rhs, 1, rhs, 1);
     // rhs now has the source term too
     // rhs = -2 (lambda + (1-theta)/theta ∇²) f0 - (∇² - lambda) f_1 - 2/theta * s
 
