@@ -8,7 +8,7 @@ std::string WaveEquationSystem::className =
 WaveEquationSystem::WaveEquationSystem(
     const LibUtilities::SessionReaderSharedPtr &pSession,
     const SpatialDomains::MeshGraphSharedPtr &pGraph)
-    : EquationSystem(pSession, pGraph), m_factors(),m_diff_in_arr(1), m_diff_out_arr(1), m_diff_fields(1) {
+    : EquationSystem(pSession, pGraph), m_factors() {
 
   pSession->LoadParameter("TimeStep", m_timestep);
   ASSERTL1(m_timestep > 0,
@@ -67,11 +67,6 @@ void WaveEquationSystem::v_InitObject(bool DeclareField)
   m_diffusion = GetDiffusionFactory().CreateInstance(diff_type, diff_type);
   m_diffusion->SetFluxVector(&WaveEquationSystem::GetDiffusionFluxVector, this);
   m_diffusion->InitObject(m_session, m_fields);
-
-  // Allocate temporary arrays used in the diffusion calc
-  m_diff_in_arr[0] = Array<OneD, NekDouble>(nPts);
-  m_diff_out_arr[0] = Array<OneD, NekDouble>(nPts, 0.0);
-  m_diff_fields[0] = m_fields[this->GetFieldIndex("u0")];
 }
 
 
@@ -146,21 +141,6 @@ void WaveEquationSystem::GetDiffusionFluxVector(
   }
 }
 
-void WaveEquationSystem::Laplace(
-                                Array<OneD, NekDouble>& rhs,
-                                const int index) {
-  const int nPts = GetNpoints();
-
-  // Use diffusion object to calculate second deriv
-  // - Copy target field into temp array to work around diffusion API restrictions
-  Vmath::Zero(nPts, m_diff_out_arr[0], 1);
-  Vmath::Vcopy(nPts, m_fields[index]->GetPhys(), 1, m_diff_in_arr[0], 1);
-  m_diffusion->Diffuse(1, m_diff_fields, m_diff_in_arr, m_diff_out_arr);
-  // - Add result to RHS
-  Vmath::Vadd(nPts, m_diff_out_arr[0], 1, rhs, 1, rhs, 1);
-
-}
-
 void WaveEquationSystem::LorenzGaugeSolve(const int field_t_index,
                                           const int field_t_minus1_index,
                                           const int source_index) {
@@ -196,7 +176,7 @@ void WaveEquationSystem::LorenzGaugeSolve(const int field_t_index,
     // Central difference timestepping
     for (int i = 0; i < nCfs; ++i)
     {
-        f0coeff[i] = 2 * f0coeff[i] - dt2 * tmp2[i] - f_1coeff[i] + scoeff[i];
+      f0coeff[i] = 2 * f0coeff[i] - dt2 * tmp2[i] - f_1coeff[i] + scoeff[i];
     }
 
     // Update f_{-1}
@@ -238,9 +218,9 @@ void WaveEquationSystem::LorenzGaugeSolve(const int field_t_index,
 
     // copy f0 coefficients to f_1 (no need to solve again!)
     Vmath::Vcopy(nPts, m_fields[f0]->GetPhys(), 1,
-        m_fields[f_1]->UpdatePhys(), 1);
+      m_fields[f_1]->UpdatePhys(), 1);
     Vmath::Vcopy(nCfs, m_fields[f0]->GetCoeffs(), 1,
-        m_fields[f_1]->UpdateCoeffs(), 1);
+      m_fields[f_1]->UpdateCoeffs(), 1);
 
     bool rhsAllZero = true;
     for (auto i : rhs) {
