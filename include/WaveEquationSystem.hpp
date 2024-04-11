@@ -68,8 +68,6 @@ private:
   double m_theta;
 
   Array<OneD, bool> v_GetSystemSingularChecks() override;
-  Array<OneD, NekDouble> m_laplacetmp;
-  Array<OneD, NekDouble> m_implicittmp;
 
   //  std::map<int, Array<OneD, NekDouble>> m_mapIntToArray;
 

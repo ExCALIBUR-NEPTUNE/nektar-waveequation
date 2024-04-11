@@ -58,8 +58,6 @@ void WaveEquationSystem::v_InitObject(bool DeclareField)
     ASSERTL1(f->GetNpoints() > 0, "GetNpoints must return > 0");
     ASSERTL1(f->GetNcoeffs() > 0, "GetNcoeffs must return > 0");
   }
-  m_laplacetmp = Array<OneD, NekDouble>(nPts);
-  m_implicittmp = Array<OneD, NekDouble>(nPts);
 
   // Set up diffusion object
   std::string diff_type;
