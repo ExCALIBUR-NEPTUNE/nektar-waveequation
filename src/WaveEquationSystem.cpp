@@ -206,6 +206,35 @@ void WaveEquationSystem::LorenzGaugeSolve(const int field_t_index,
     // backward transform -- not really necessary
     m_fields[f0]->BwdTrans(f0coeff, f0phys);
     m_fields[f_1]->BwdTrans(f_1coeff, f_1phys);
+  } else if (m_theta == 1.0) {
+      double lambda = 1.0 / dt2;
+
+      for (int i = 0; i < nCfs; ++i)
+      {
+          // This is negative, because HelmSolve will negate the input to be
+          // consistent with the Helmholtz equation definition.
+          tmp2[i] = -lambda * (2 * f0coeff[i] - f_1coeff[i]);
+      }
+
+      // Evaluate mass matrix action
+      MultiRegions::GlobalMatrixKey mkey(StdRegions::eMass);
+      m_fields[f0]->GeneralMatrixOp(mkey, tmp2, tmp);
+
+      // Zero storage
+      Vmath::Zero(nCfs, tmp2, 1);
+
+      m_factors[StdRegions::eFactorLambda] = lambda;
+
+      m_fields[f0]->HelmSolve(tmp, tmp2, m_factors, StdRegions::NullVarCoeffMap,
+                              MultiRegions::NullVarFactorsMap,
+                              NullNekDouble1DArray, false);
+
+      // Rotate storage
+      Vmath::Vcopy(nCfs, f0coeff, 1, f_1coeff, 1);
+      Vmath::Vcopy(nCfs, tmp2, 1, f0coeff, 1);
+
+      m_fields[f0]->BwdTrans(f0coeff, f0phys);
+      m_fields[f_1]->BwdTrans(f_1coeff, f_1phys);
   } else {
     // need in the form (∇² - lambda)f⁺ = rhs, where
     double lambda = 2.0 / dt2 / m_theta;
