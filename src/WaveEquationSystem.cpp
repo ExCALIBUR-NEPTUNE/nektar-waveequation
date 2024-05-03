@@ -235,7 +235,7 @@ void WaveEquationSystem::LorenzGaugeSolve(const int field_t_index,
 
     for (int i = 0; i < nCfs; ++i)
     {
-        tmp2[i] = -(2 * (1 - m_theta) / m_theta * f0coeff[i] + f_1coeff[i]);
+        tmp2[i] = (2 * (1 - m_theta) / m_theta * f0coeff[i] + f_1coeff[i]);
     }
 
     // zero tmp
@@ -247,11 +247,14 @@ void WaveEquationSystem::LorenzGaugeSolve(const int field_t_index,
     for (int i = 0; i < nCfs; ++i)
     {
         // copy the second term and sources into rhs
-        rhs[i] += tmp[i] + 2.0 / m_theta * scoeff[i]; // should have minus sign?
+        // being careful to subtract rather than add because of the HelmSolve
+        rhs[i] -= tmp[i] + 2.0 / m_theta * scoeff[i];
     }
 
     // Zero storage
     Vmath::Zero(nCfs, tmp2, 1);
+
+    m_factors[StdRegions::eFactorLambda] = lambda;
 
     m_fields[f0]->HelmSolve(rhs, tmp2, m_factors, StdRegions::NullVarCoeffMap,
                             MultiRegions::NullVarFactorsMap,
