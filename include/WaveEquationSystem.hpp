@@ -62,25 +62,17 @@ protected:
   std::vector<Array<OneD, NekDouble>> m_physarrays;
   std::vector<Array<OneD, NekDouble>> m_coeffarrays;
 
-  void Laplace(Array<OneD, NekDouble> &rhs, const int index);
-
 private:
 
   double m_timeStep;
   double m_theta;
 
   Array<OneD, bool> v_GetSystemSingularChecks() override;
-  Array<OneD, NekDouble> m_laplacetmp;
-  Array<OneD, NekDouble> m_implicittmp;
 
   //  std::map<int, Array<OneD, NekDouble>> m_mapIntToArray;
 
   // Diffusion object
   DiffusionSharedPtr m_diffusion;
-
-  // Arrays to store temporary fields and values for the diffusion operation
-  Array<OneD, MultiRegions::ExpListSharedPtr> m_diff_fields;
-  Array<OneD, Array<OneD, NekDouble>> m_diff_in_arr, m_diff_out_arr;
 
   void GetDiffusionFluxVector(
     const Array<OneD, Array<OneD, NekDouble>> &in_arr,

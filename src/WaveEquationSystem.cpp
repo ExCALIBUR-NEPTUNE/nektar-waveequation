@@ -8,7 +8,7 @@ std::string WaveEquationSystem::className =
 WaveEquationSystem::WaveEquationSystem(
     const LibUtilities::SessionReaderSharedPtr &pSession,
     const SpatialDomains::MeshGraphSharedPtr &pGraph)
-    : EquationSystem(pSession, pGraph), m_factors(),m_diff_in_arr(1), m_diff_out_arr(1), m_diff_fields(1) {
+    : EquationSystem(pSession, pGraph), m_factors() {
 
   pSession->LoadParameter("TimeStep", m_timestep);
   ASSERTL1(m_timestep > 0,
@@ -58,8 +58,6 @@ void WaveEquationSystem::v_InitObject(bool DeclareField)
     ASSERTL1(f->GetNpoints() > 0, "GetNpoints must return > 0");
     ASSERTL1(f->GetNcoeffs() > 0, "GetNcoeffs must return > 0");
   }
-  m_laplacetmp = Array<OneD, NekDouble>(nPts);
-  m_implicittmp = Array<OneD, NekDouble>(nPts);
 
   // Set up diffusion object
   std::string diff_type;
@@ -67,11 +65,6 @@ void WaveEquationSystem::v_InitObject(bool DeclareField)
   m_diffusion = GetDiffusionFactory().CreateInstance(diff_type, diff_type);
   m_diffusion->SetFluxVector(&WaveEquationSystem::GetDiffusionFluxVector, this);
   m_diffusion->InitObject(m_session, m_fields);
-
-  // Allocate temporary arrays used in the diffusion calc
-  m_diff_in_arr[0] = Array<OneD, NekDouble>(nPts);
-  m_diff_out_arr[0] = Array<OneD, NekDouble>(nPts, 0.0);
-  m_diff_fields[0] = m_fields[this->GetFieldIndex("u0")];
 }
 
 
@@ -146,21 +139,6 @@ void WaveEquationSystem::GetDiffusionFluxVector(
   }
 }
 
-void WaveEquationSystem::Laplace(
-                                Array<OneD, NekDouble>& rhs,
-                                const int index) {
-  const int nPts = GetNpoints();
-
-  // Use diffusion object to calculate second deriv
-  // - Copy target field into temp array to work around diffusion API restrictions
-  Vmath::Zero(nPts, m_diff_out_arr[0], 1);
-  Vmath::Vcopy(nPts, m_fields[index]->GetPhys(), 1, m_diff_in_arr[0], 1);
-  m_diffusion->Diffuse(1, m_diff_fields, m_diff_in_arr, m_diff_out_arr);
-  // - Add result to RHS
-  Vmath::Vadd(nPts, m_diff_out_arr[0], 1, rhs, 1, rhs, 1);
-
-}
-
 void WaveEquationSystem::LorenzGaugeSolve(const int field_t_index,
                                           const int field_t_minus1_index,
                                           const int source_index) {
@@ -180,15 +158,15 @@ void WaveEquationSystem::LorenzGaugeSolve(const int field_t_index,
   auto &f_1coeff = m_fields[f_1]->UpdateCoeffs();
   auto scoeff   = m_fields[s]->GetCoeffs();
 
-  Array<OneD, NekDouble> rhs(nPts, 0.0), tmp(nCfs, 0.0), tmp2(nCfs, 0.0);
-  //Laplace(rhs, f0); // rhs = ∇² f0
+  Array<OneD, NekDouble> rhs(nCfs, 0.0), tmp(nCfs, 0.0), tmp2(nCfs, 0.0);
+
+  // Apply Laplacian matrix op -> tmp
+  MultiRegions::GlobalMatrixKey laplacianKey(StdRegions::eLaplacian);
+  MultiRegions::GlobalMatrixKey massKey(StdRegions::eMass);
 
   if (m_theta == 0.0) {
-    // Apply Laplacian matrix op -> tmp
-    MultiRegions::GlobalMatrixKey mkey(StdRegions::eLaplacian);
-
     // Evaluate M^{-1} * L * u
-    m_fields[f0]->GeneralMatrixOp(mkey, f0coeff, tmp);
+    m_fields[f0]->GeneralMatrixOp(laplacianKey, f0coeff, tmp);
     m_fields[f0]->MultiplyByInvMassMatrix(tmp, tmp2);
 
     // Temporary copy for f_0 to transfer to f_{-1}
@@ -197,7 +175,7 @@ void WaveEquationSystem::LorenzGaugeSolve(const int field_t_index,
     // Central difference timestepping
     for (int i = 0; i < nCfs; ++i)
     {
-        f0coeff[i] = 2 * f0coeff[i] - dt2 * tmp2[i] - f_1coeff[i];
+      f0coeff[i] = 2 * f0coeff[i] - dt2 * tmp2[i] - f_1coeff[i] + dt2 * scoeff[i];
     }
 
     // Update f_{-1}
@@ -207,82 +185,87 @@ void WaveEquationSystem::LorenzGaugeSolve(const int field_t_index,
     m_fields[f0]->BwdTrans(f0coeff, f0phys);
     m_fields[f_1]->BwdTrans(f_1coeff, f_1phys);
   } else if (m_theta == 1.0) {
-      double lambda = 1.0 / dt2;
+    double lambda = 1.0 / dt2;
 
-      for (int i = 0; i < nCfs; ++i)
-      {
-          // This is negative, because HelmSolve will negate the input to be
-          // consistent with the Helmholtz equation definition.
-          tmp2[i] = -lambda * (2 * f0coeff[i] - f_1coeff[i]);
-      }
+    for (int i = 0; i < nCfs; ++i)
+    {
+        // This is negative, because HelmSolve will negate the input to be
+        // consistent with the Helmholtz equation definition.
+        tmp2[i] = -lambda * (2 * f0coeff[i] - f_1coeff[i]);
+    }
 
-      // Evaluate mass matrix action
-      MultiRegions::GlobalMatrixKey mkey(StdRegions::eMass);
-      m_fields[f0]->GeneralMatrixOp(mkey, tmp2, tmp);
+    // Evaluate mass matrix action
+    m_fields[f0]->GeneralMatrixOp(massKey, tmp2, tmp);
 
-      // Zero storage
-      Vmath::Zero(nCfs, tmp2, 1);
+    // Zero storage
+    Vmath::Zero(nCfs, tmp2, 1);
 
-      m_factors[StdRegions::eFactorLambda] = lambda;
+    for (int i = 0; i < nCfs; ++i)
+    {
+        // This is negative, because HelmSolve will negate the input to be
+        // consistent with the Helmholtz equation definition.
+        tmp[i] -= scoeff[i];
+    }
 
-      m_fields[f0]->HelmSolve(tmp, tmp2, m_factors, StdRegions::NullVarCoeffMap,
-                              MultiRegions::NullVarFactorsMap,
-                              NullNekDouble1DArray, false);
+    m_factors[StdRegions::eFactorLambda] = lambda;
 
-      // Rotate storage
-      Vmath::Vcopy(nCfs, f0coeff, 1, f_1coeff, 1);
-      Vmath::Vcopy(nCfs, tmp2, 1, f0coeff, 1);
+    m_fields[f0]->HelmSolve(tmp, tmp2, m_factors, StdRegions::NullVarCoeffMap,
+                            MultiRegions::NullVarFactorsMap,
+                            NullNekDouble1DArray, false);
 
-      m_fields[f0]->BwdTrans(f0coeff, f0phys);
-      m_fields[f_1]->BwdTrans(f_1coeff, f_1phys);
+    // Rotate storage
+    Vmath::Vcopy(nCfs, f0coeff, 1, f_1coeff, 1);
+    Vmath::Vcopy(nCfs, tmp2, 1, f0coeff, 1);
+
+    m_fields[f0]->BwdTrans(f0coeff, f0phys);
+    m_fields[f_1]->BwdTrans(f_1coeff, f_1phys);
+
   } else {
     // need in the form (∇² - lambda)f⁺ = rhs, where
     double lambda = 2.0 / dt2 / m_theta;
 
-    // and currently rhs = ∇² f0
-    Vmath::Smul(nPts, -2 * (1 - m_theta) / m_theta, rhs, 1, rhs, 1);
-    // Svtvp (n, a, x, _, y, _, z, _) -> z = a * x + y
-    Vmath::Svtvp(nPts, -2 * lambda, f0phys, 1, rhs, 1, rhs,
-                 1); // rhs now holds the f0 rhs values
-
-    // and currently rhs = -2 (lambda + (1-theta)/theta ∇²) f0
-
-    Laplace(m_implicittmp, f_1); // m_implicittmp = ∇² f_1
-
-    // Svtvp (n, a, x, _, y, _, z, _) -> z = a * x + y
-    Vmath::Svtvp(nPts, -lambda, f_1phys, 1, m_implicittmp, 1, m_implicittmp, 1);
-    // m_implicittmp = (∇² - lambda) f_1
-    Vmath::Vsub(nPts, rhs, 1, m_implicittmp, 1, rhs, 1); // rhs now holds the f0 and f_1 rhs values
-    // rhs = rhs - m_implicittmp
-    // rhs = -2 (lambda + (1-theta)/theta ∇²) f0 - (∇² - lambda) f_1
-
-    // Svtvp (n, a, x, _, y, _, z, _) -> z = a * x + y
-    Vmath::Svtvp(nPts, -2.0 / m_theta, sphys, 1, rhs, 1, rhs, 1);
-    // rhs now has the source term too
-    // rhs = -2 (lambda + (1-theta)/theta ∇²) f0 - (∇² - lambda) f_1 - 2/theta * s
-
-    // copy f0 coefficients to f_1 (no need to solve again!)
-    Vmath::Vcopy(nPts, m_fields[f0]->GetPhys(), 1,
-        m_fields[f_1]->UpdatePhys(), 1);
-    Vmath::Vcopy(nCfs, m_fields[f0]->GetCoeffs(), 1,
-        m_fields[f_1]->UpdateCoeffs(), 1);
-
-    bool rhsAllZero = true;
-    for (auto i : rhs) {
-      if (i != 0.0) {
-        rhsAllZero = false;
-        break;
-      }
+    for (int i = 0; i < nCfs; ++i)
+    {
+        // This is negative, because HelmSolve will negate the input to be
+        // consistent with the Helmholtz equation definition.
+        tmp2[i] = -lambda * (2 * f0coeff[i] - f_1coeff[i]);
     }
-    // now solve f1 but store in f0
-    if (!rhsAllZero) {
-      m_factors[StdRegions::eFactorLambda] = lambda;
-      m_fields[f0]->HelmSolve(rhs, m_fields[f0]->UpdateCoeffs(), m_factors);
-      m_fields[f0]->BwdTrans(m_fields[f0]->GetCoeffs(), m_fields[f0]->UpdatePhys());
-    } else {
-      Vmath::Zero(nCfs, m_fields[f0]->UpdateCoeffs(), 1);
-      Vmath::Zero(nPts, m_fields[f0]->UpdatePhys(), 1);
+
+    m_fields[f0]->GeneralMatrixOp(massKey, tmp2, rhs);
+
+    for (int i = 0; i < nCfs; ++i)
+    {
+        tmp2[i] = -(2 * (1 - m_theta) / m_theta * f0coeff[i] + f_1coeff[i]);
     }
+
+    // zero tmp
+    Vmath::Zero(nCfs, tmp, 1);
+
+    // now do diffusion operator
+    m_fields[f0]->GeneralMatrixOp(laplacianKey, tmp2, tmp);
+
+    for (int i = 0; i < nCfs; ++i)
+    {
+        // copy the second term and sources into rhs
+        // being careful to subtract rather than add because of the HelmSolve
+        rhs[i] -= tmp[i] + 2.0 / m_theta * scoeff[i];
+    }
+
+    // Zero storage
+    Vmath::Zero(nCfs, tmp2, 1);
+
+    m_factors[StdRegions::eFactorLambda] = lambda;
+
+    m_fields[f0]->HelmSolve(rhs, tmp2, m_factors, StdRegions::NullVarCoeffMap,
+                            MultiRegions::NullVarFactorsMap,
+                            NullNekDouble1DArray, false);
+
+    // Rotate storage
+    Vmath::Vcopy(nCfs, f0coeff, 1, f_1coeff, 1);
+    Vmath::Vcopy(nCfs, tmp2, 1, f0coeff, 1);
+
+    m_fields[f0]->BwdTrans(f0coeff, f0phys);
+    m_fields[f_1]->BwdTrans(f_1coeff, f_1phys);
   }
 }
 
