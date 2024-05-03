@@ -33,7 +33,7 @@
             <P> NumTimeSteps = 1024 * 2^resolutionfactor </P>
             <P> IO_InfoSteps   = 16 * 2^resolutionfactor </P>
             <P> IO_CheckSteps  = 16 * 2^resolutionfactor </P>
-            <P> kx = 0.0 * PI </P>
+            <P> kx = 2.0 * PI </P>
             <P> ky = 2.0 * PI </P>
             <P> omega = sqrt(kx^2 + ky^2) </P>
         </PARAMETERS>
