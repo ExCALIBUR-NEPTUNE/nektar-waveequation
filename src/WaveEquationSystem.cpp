@@ -235,7 +235,7 @@ void WaveEquationSystem::LorenzGaugeSolve(const int field_t_index,
 
     for (int i = 0; i < nCfs; ++i)
     {
-        tmp2[i] = (2 * (1 - m_theta) / m_theta * f0coeff[i] + f_1coeff[i]);
+        tmp2[i] = -(2 * (1 - m_theta) / m_theta * f0coeff[i] + f_1coeff[i]);
     }
 
     // zero tmp
