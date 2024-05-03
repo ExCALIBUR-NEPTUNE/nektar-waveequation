@@ -235,8 +235,6 @@ void WaveEquationSystem::LorenzGaugeSolve(const int field_t_index,
 
     for (int i = 0; i < nCfs; ++i)
     {
-        // This is negative, because HelmSolve will negate the input to be
-        // consistent with the Helmholtz equation definition.
         tmp2[i] = -(2 * (1 - m_theta) / m_theta * f0coeff[i] + f_1coeff[i]);
     }
 
